@@ -1,0 +1,185 @@
+ARG DS_VERSION=6.0.1
+
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-devel as builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG DISTRO=ubuntu1804
+ARG ARCH=x86_64
+
+RUN apt-get install -y --no-install-recommends \
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt autoremove \
+    && apt-get clean
+
+WORKDIR /tmp
+RUN apt-key del 7fa2af80 \
+    && wget https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/cuda-keyring_1.0-1_all.deb \
+    && dpkg -i ./cuda-keyring_1.0-1_all.deb \
+    && sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/sources.list.d/* \
+    && sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/* \
+    && rm cuda-keyring_1.0-1_all.deb
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    # libatlas-base-dev libatlas3-base \
+    # clang-8 \
+    # libopenblas-dev \
+    # libpcre2-dev \
+    # flex bison \
+    # libglib2.0-dev \
+    # libjson-glib-dev \
+    # uuid-dev \
+    # libssl-dev \
+    curl \
+    # libjsoncpp-dev \
+    # libopencv-dev \
+    libhiredis-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt autoremove \
+    && apt-get clean
+
+RUN wget https://github.com/civetweb/civetweb/archive/refs/tags/v1.16.tar.gz \
+    && tar -xvf v1.16.tar.gz \
+    && rm v1.16.tar.gz \
+    && cd civetweb-1.16 \
+    && WITH_CPP=1 TARGET_OS=LINUX make \
+    && WITH_CPP=1 TARGET_OS=LINUX make install \
+    && WITH_CPP=1 TARGET_OS=LINUX make install-headers \
+    && WITH_CPP=1 TARGET_OS=LINUX make install-slib \
+    && WITH_CPP=1 TARGET_OS=LINUX make install-lib \
+    && cd /tmp \
+    && rm -rf /tmp/civetweb-1.16/
+# /usr/local/etc/civetweb.conf
+# /usr/local/share/doc/civetweb
+# /usr/local/lib/libcivetweb.a
+# /usr/local/lib/libcivetweb.so.1
+# /usr/local/lib/libcivetweb.so.1.16.0
+# /usr/local/lib/libcivetweb.so
+# /usr/local/include/civetweb.h
+
+RUN git clone https://github.com/sewenew/redis-plus-plus.git \
+    && cd redis-plus-plus \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make \
+    && make install \
+    && cd /tmp \
+    && rm -rf redis-plus-plus
+# /usr/local/share/cmake/redis++
+# /usr/local/lib/libredis++.so.1.3.10
+# /usr/local/lib/libredis++.a
+# /usr/local/lib/libredis++.so.1
+# /usr/local/lib/libredis++.so
+# /usr/local/lib/pkgconfig/redis++.pc
+# /usr/local/include/sw/redis++
+
+# Cmake
+WORKDIR /tmp
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.5/cmake-3.19.5-Linux-x86_64.tar.gz \
+    && tar -zxvf cmake-3.19.5-Linux-x86_64.tar.gz \
+    && rm cmake-3.19.5-Linux-x86_64.tar.gz \
+    && cd /tmp/cmake-3.19.5-Linux-x86_64/ \
+    && cp -rf bin/ doc/ share/ /usr/local/ \
+    && cp -rf man/* /usr/local/man \
+    && sync \
+    && cmake --version \
+    && cd /tmp \
+    && rm -rf /tmp/cmake-3.19.5-Linux-x86_64/
+
+# Build TensorRT
+ARG TRT_OSS_CHECKOUT_TAG=release/8.2
+ARG DGPU_ARCHS=75
+ARG TENSORRT_REPO=https://github.com/hiennguyen9874/TensorRT
+
+WORKDIR /tmp
+RUN git clone -b $TRT_OSS_CHECKOUT_TAG $TENSORRT_REPO \
+    && export TRT_SOURCE=/tmp/TensorRT \
+    && cd /tmp/TensorRT \
+    && git submodule update --init --recursive \
+    && mkdir -p build \
+    && cd /tmp/TensorRT/build \
+    && cmake .. -DGPU_ARCHS=$DGPU_ARCHS \
+    -DTRT_LIB_DIR=/usr/lib/x86_64-linux-gnu/ \
+    -DCMAKE_C_COMPILER=/usr/bin/gcc \
+    -DTRT_BIN_DIR=`pwd`/out \
+    && make nvinfer_plugin -j$(nproc) \
+    && mkdir -p /TensorRT \
+    && cp /tmp/TensorRT/build/libnvinfer_plugin.so.8.* /TensorRT \
+    && cp $(find /tmp/TensorRT/build -name "libnvinfer_plugin.so.8.*" -print -quit) \
+    $(find /usr/lib/x86_64-linux-gnu/ -name "libnvinfer_plugin.so.8.*" -print -quit) \
+    && ldconfig \
+    && cd /tmp \
+    && rm -rf /tmp/TensorRT
+
+WORKDIR /opt/nvidia/deepstream/deepstream-6.0
+
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-iot as runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG DISTRO=ubuntu1804
+ARG ARCH=x86_64
+
+RUN apt-get install -y --no-install-recommends \
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt autoremove \
+    && apt-get clean
+
+WORKDIR /tmp
+RUN apt-key del 7fa2af80 \
+    && wget https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/cuda-keyring_1.0-1_all.deb \
+    && dpkg -i ./cuda-keyring_1.0-1_all.deb \
+    && sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/sources.list.d/* \
+    && sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/* \
+    && rm cuda-keyring_1.0-1_all.deb
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libatlas-base-dev libatlas3-base \
+    clang-8 \
+    libopenblas-dev \
+    libpcre2-dev \
+    flex bison \
+    libglib2.0-dev \
+    libjson-glib-dev \
+    uuid-dev \
+    libssl-dev \
+    curl \
+    libjsoncpp-dev \
+    libopencv-dev \
+    libhiredis-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt autoremove \
+    && apt-get clean
+
+# civetweb
+COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
+COPY --from=builder /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
+COPY --from=builder /usr/local/lib/libcivetweb.a /usr/local/lib/libcivetweb.a
+COPY --from=builder /usr/local/lib/libcivetweb.so.1 /usr/local/lib/libcivetweb.so.1
+COPY --from=builder /usr/local/lib/libcivetweb.so.1.16.0 /usr/local/lib/libcivetweb.so.1.16.0
+COPY --from=builder /usr/local/lib/libcivetweb.so /usr/local/lib/libcivetweb.so
+COPY --from=builder /usr/local/include/civetweb.h /usr/local/include/civetweb.h
+
+# redis plus plus
+COPY --from=builder /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
+COPY --from=builder /usr/local/lib/libredis++.so.1.3.10 /usr/local/lib/libredis++.so.1.3.10
+COPY --from=builder /usr/local/lib/libredis++.a /usr/local/lib/libredis++.a
+COPY --from=builder /usr/local/lib/libredis++.so.1 /usr/local/lib/libredis++.so.1
+COPY --from=builder /usr/local/lib/libredis++.so /usr/local/lib/libredis++.so
+COPY --from=builder /usr/local/lib/pkgconfig/redis++.pc /usr/local/lib/pkgconfig/redis++.pc
+COPY --from=builder /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+
+# tensorRT
+COPY --from=builder /TensorRT /tmp/TensorRT
+RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
+    $(find /usr/lib/x86_64-linux-gnu/ -name "libnvinfer_plugin.so.8.*" -print -quit) \
+    && ldconfig \
+    && cd /tmp \
+    && rm -rf /tmp/TensorRT
+
+WORKDIR /opt/nvidia/deepstream/deepstream-6.0
