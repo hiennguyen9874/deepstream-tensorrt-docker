@@ -15,7 +15,7 @@
 
 - Build:
   ```
-  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.0.1-devel \
+  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.0.1-devel-75 \
       --build-arg DS_VERSION=6.0.1 \
       --build-arg ARCH=x86_64 \
       --build-arg TRT_OSS_CHECKOUT_TAG=release/8.2 \
@@ -24,13 +24,13 @@
       -f Dockerfile.devel \
       .
   ```
-- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.0.1-devel`
+- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.0.1-devel-75`
 
 ### Iot
 
 - Build:
   ```
-  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.0.1-iot \
+  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.0.1-iot-75 \
       --build-arg DS_VERSION=6.0.1 \
       --build-arg ARCH=x86_64 \
       --build-arg TRT_OSS_CHECKOUT_TAG=release/8.2 \
@@ -39,4 +39,4 @@
       -f Dockerfile.iot \
       .
   ```
-- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.0.1-iot`
+- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.0.1-iot-75`
