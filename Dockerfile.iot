@@ -91,7 +91,6 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.5/cmake-3.19.5
 
 # Build TensorRT
 ARG TRT_OSS_CHECKOUT_TAG=release/8.2
-ARG DGPU_ARCHS=75
 ARG TENSORRT_REPO=https://github.com/hiennguyen9874/TensorRT
 
 WORKDIR /tmp
@@ -101,7 +100,7 @@ RUN git clone -b $TRT_OSS_CHECKOUT_TAG $TENSORRT_REPO \
     && git submodule update --init --recursive \
     && mkdir -p build \
     && cd /tmp/TensorRT/build \
-    && cmake .. -DGPU_ARCHS=$DGPU_ARCHS \
+    && cmake .. \
     -DTRT_LIB_DIR=/usr/lib/x86_64-linux-gnu/ \
     -DCMAKE_C_COMPILER=/usr/bin/gcc \
     -DTRT_BIN_DIR=`pwd`/out \
