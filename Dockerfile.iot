@@ -155,6 +155,10 @@ RUN apt-get update && \
     && apt autoremove \
     && apt-get clean
 
+RUN ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so && \
+    ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so && \
+    ldconfig
+
 # civetweb
 COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
 COPY --from=builder /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
@@ -181,5 +185,6 @@ RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
     && ldconfig \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
+
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.0
