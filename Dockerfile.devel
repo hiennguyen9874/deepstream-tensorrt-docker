@@ -58,6 +58,7 @@ RUN wget https://github.com/civetweb/civetweb/archive/refs/tags/v1.16.tar.gz \
 # /usr/local/lib/libcivetweb.so.1.16.0
 # /usr/local/lib/libcivetweb.so
 # /usr/local/include/civetweb.h
+# /usr/local/include/CivetServer.h
 
 RUN git clone https://github.com/sewenew/redis-plus-plus.git \
     && cd redis-plus-plus \
@@ -163,6 +164,7 @@ COPY --from=builder /usr/local/lib/libcivetweb.so.1 /usr/local/lib/libcivetweb.s
 COPY --from=builder /usr/local/lib/libcivetweb.so.1.16.0 /usr/local/lib/libcivetweb.so.1.16.0
 COPY --from=builder /usr/local/lib/libcivetweb.so /usr/local/lib/libcivetweb.so
 COPY --from=builder /usr/local/include/civetweb.h /usr/local/include/civetweb.h
+COPY --from=builder /usr/local/include/CivetServer.h /usr/local/include/CivetServer.h
 
 # redis plus plus
 COPY --from=builder /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
