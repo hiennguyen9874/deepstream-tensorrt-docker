@@ -21,7 +21,7 @@ RUN apt-key del 7fa2af80 \
     && sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/* \
     && rm cuda-keyring_1.0-1_all.deb
 
-RUN apt-get update && \
+RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     # libatlas-base-dev libatlas3-base \
     # clang-8 \
@@ -136,7 +136,7 @@ RUN apt-key del 7fa2af80 \
     && sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/* \
     && rm cuda-keyring_1.0-1_all.deb
 
-RUN apt-get update && \
+RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     libatlas-base-dev libatlas3-base \
     clang-8 \
