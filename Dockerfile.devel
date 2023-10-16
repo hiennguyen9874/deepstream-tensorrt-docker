@@ -1,25 +1,8 @@
-ARG DS_VERSION=6.0.1
+ARG DS_VERSION=6.3
 
-FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-devel as builder
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-gc-triton-devel as builder
 
 ENV DEBIAN_FRONTEND=noninteractive
-
-ARG DISTRO=ubuntu1804
-ARG ARCH=x86_64
-
-RUN apt-get install -y --no-install-recommends \
-    wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove \
-    && apt-get clean
-
-WORKDIR /tmp
-RUN apt-key del 7fa2af80 \
-    && wget https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/cuda-keyring_1.0-1_all.deb \
-    && dpkg -i ./cuda-keyring_1.0-1_all.deb \
-    && sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/sources.list.d/* \
-    && sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/* \
-    && rm cuda-keyring_1.0-1_all.deb
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
@@ -114,28 +97,11 @@ RUN git clone -b $TRT_OSS_CHECKOUT_TAG $TENSORRT_REPO \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
 
-WORKDIR /opt/nvidia/deepstream/deepstream-6.0
+WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
-FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-devel as runtime
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-gc-triton-devel as runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
-
-ARG DISTRO=ubuntu1804
-ARG ARCH=x86_64
-
-RUN apt-get install -y --no-install-recommends \
-    wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove \
-    && apt-get clean
-
-WORKDIR /tmp
-RUN apt-key del 7fa2af80 \
-    && wget https://developer.download.nvidia.com/compute/cuda/repos/${DISTRO}/${ARCH}/cuda-keyring_1.0-1_all.deb \
-    && dpkg -i ./cuda-keyring_1.0-1_all.deb \
-    && sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/sources.list.d/* \
-    && sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/* \
-    && rm cuda-keyring_1.0-1_all.deb
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
@@ -144,7 +110,7 @@ RUN apt-get update -y && \
     libopenblas-dev \
     libpcre2-dev \
     flex bison \
-    libglib2.0-dev \
+    libglib2.0 libglib2.0-dev \
     libjson-glib-dev \
     uuid-dev \
     libssl-dev \
@@ -152,6 +118,18 @@ RUN apt-get update -y && \
     libjsoncpp-dev \
     libopencv-dev \
     libhiredis-dev \
+    gstreamer1.0-libav \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+    libavresample-dev libavresample4 libavutil-dev libavutil56 libavcodec-dev \
+    libavcodec58 libavformat-dev libavformat58 libavfilter7 libde265-dev \
+    libde265-0 libx264-155 libx265-179 libvpx6 \
+    libmpeg2encpp-2.1-0 libmpeg2-4 libmpg123-0 \
+    libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgstrtspserver-1.0-dev \
+    libx11-dev \
+    libyaml-cpp-dev \
+    protobuf-compiler \
+    libjansson4  libjansson-dev \
+    libprotobuf-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt autoremove \
     && apt-get clean
@@ -183,4 +161,4 @@ RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
 
-WORKDIR /opt/nvidia/deepstream/deepstream-6.0
+WORKDIR /opt/nvidia/deepstream/deepstream-6.3
