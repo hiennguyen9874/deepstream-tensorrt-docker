@@ -26,17 +26,32 @@
   ```
 - Push: `docker push hiennguyen9874/deepstream-tensorrt:6.3-devel`
 
-### Iot
+### Samples
 
 - Build:
   ```
-  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.3-iot \
+  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.3-samples \
       --build-arg DS_VERSION=6.3 \
       --build-arg ARCH=x86_64 \
       --build-arg TRT_OSS_CHECKOUT_TAG=release/8.5 \
       --build-arg TENSORRT_REPO=https://github.com/hiennguyen9874/TensorRT \
-      --target iot \
+      --target samples \
       -f Dockerfile \
       .
   ```
-- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.3-iot`
+- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.3-samples`
+
+### Base
+
+- Build:
+  ```
+  DOCKER_BUILDKIT=1 docker build -t hiennguyen9874/deepstream-tensorrt:6.3-base \
+      --build-arg DS_VERSION=6.3 \
+      --build-arg ARCH=x86_64 \
+      --build-arg TRT_OSS_CHECKOUT_TAG=release/8.5 \
+      --build-arg TENSORRT_REPO=https://github.com/hiennguyen9874/TensorRT \
+      --target base \
+      -f Dockerfile \
+      .
+  ```
+- Push: `docker push hiennguyen9874/deepstream-tensorrt:6.3-base`
