@@ -125,7 +125,7 @@ RUN git clone --depth 1 --branch v1.2.4 https://github.com/jupp0r/prometheus-cpp
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
-FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-gc-triton-devel as runtime
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-gc-triton-devel as dev
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -158,6 +158,82 @@ RUN apt-get update -y && \
     && rm -rf /var/lib/apt/lists/* \
     && apt autoremove \
     && apt-get clean
+
+# civetweb
+COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
+COPY --from=builder /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
+COPY --from=builder /usr/local/lib/libcivetweb.a /usr/local/lib/libcivetweb.a
+COPY --from=builder /usr/local/lib/libcivetweb.so.1 /usr/local/lib/libcivetweb.so.1
+COPY --from=builder /usr/local/lib/libcivetweb.so.1.16.0 /usr/local/lib/libcivetweb.so.1.16.0
+COPY --from=builder /usr/local/lib/libcivetweb.so /usr/local/lib/libcivetweb.so
+COPY --from=builder /usr/local/include/civetweb.h /usr/local/include/civetweb.h
+COPY --from=builder /usr/local/include/CivetServer.h /usr/local/include/CivetServer.h
+
+# redis plus plus
+COPY --from=builder /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
+COPY --from=builder /usr/local/lib/libredis++.so.1.3.10 /usr/local/lib/libredis++.so.1.3.10
+COPY --from=builder /usr/local/lib/libredis++.a /usr/local/lib/libredis++.a
+COPY --from=builder /usr/local/lib/libredis++.so.1 /usr/local/lib/libredis++.so.1
+COPY --from=builder /usr/local/lib/libredis++.so /usr/local/lib/libredis++.so
+COPY --from=builder /usr/local/lib/pkgconfig/redis++.pc /usr/local/lib/pkgconfig/redis++.pc
+COPY --from=builder /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+
+# tensorRT
+COPY --from=builder /TensorRT /tmp/TensorRT
+RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
+    $(find /usr/lib/x86_64-linux-gnu/ -name "libnvinfer_plugin.so.8.*" -print -quit) \
+    && ldconfig \
+    && cd /tmp \
+    && rm -rf /tmp/TensorRT
+
+COPY --from=builder /usr/local/include/prometheus /usr/local/include/prometheus
+COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2.4 /usr/local/lib/libprometheus-cpp-core.so.1.2.4
+COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2 /usr/local/lib/libprometheus-cpp-core.so.1.2
+COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so /usr/local/lib/libprometheus-cpp-core.so
+COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so /usr/local/lib/libprometheus-cpp-pull.so
+COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2 /usr/local/lib/libprometheus-cpp-pull.so.1.2
+COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2.4 /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
+COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-core.pc /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
+COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
+COPY --from=builder /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
+COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2.4 /usr/local/lib/libprometheus-cpp-push.so.1.2.4
+COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2 /usr/local/lib/libprometheus-cpp-push.so.1.2
+COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so /usr/local/lib/libprometheus-cpp-push.so
+COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-push.pc /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
+
+WORKDIR /opt/nvidia/deepstream/deepstream-6.3
+
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-samples as devel
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    libatlas-base-dev libatlas3-base \
+    libopenblas-dev \
+    libpcre2-dev \
+    flex bison \
+    libglib2.0 libglib2.0-dev \
+    libjson-glib-dev \
+    uuid-dev \
+    libssl-dev \
+    curl \
+    libjsoncpp-dev \
+    libopencv-dev \
+    libhiredis-dev \
+    gstreamer1.0-libav \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+    libavresample-dev libavresample4 libavutil-dev libavutil56 libavcodec-dev \
+    libavcodec58 libavformat-dev libavformat58 libavfilter7 libde265-dev \
+    libde265-0 libx264-155 libx265-179 libvpx6 \
+    libmpeg2encpp-2.1-0 libmpeg2-4 libmpg123-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt autoremove \
+    && apt-get clean
+
+RUN ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so && \
+    ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so && \
+    ldconfig
 
 # civetweb
 COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf

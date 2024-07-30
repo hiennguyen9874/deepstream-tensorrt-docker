@@ -20,7 +20,8 @@
       --build-arg ARCH=x86_64 \
       --build-arg TRT_OSS_CHECKOUT_TAG=release/8.5 \
       --build-arg TENSORRT_REPO=https://github.com/hiennguyen9874/TensorRT \
-      -f Dockerfile.devel \
+      --target devel \
+      -f Dockerfile \
       .
   ```
 - Push: `docker push hiennguyen9874/deepstream-tensorrt:6.3-devel`
@@ -34,7 +35,8 @@
       --build-arg ARCH=x86_64 \
       --build-arg TRT_OSS_CHECKOUT_TAG=release/8.5 \
       --build-arg TENSORRT_REPO=https://github.com/hiennguyen9874/TensorRT \
-      -f Dockerfile.iot \
+      --target iot \
+      -f Dockerfile \
       .
   ```
 - Push: `docker push hiennguyen9874/deepstream-tensorrt:6.3-iot`
