@@ -42,7 +42,7 @@ RUN wget https://github.com/civetweb/civetweb/archive/refs/tags/v1.16.tar.gz \
 # /usr/local/include/civetweb.h
 # /usr/local/include/CivetServer.h
 
-RUN git clone https://github.com/sewenew/redis-plus-plus.git \
+RUN git clone -b 1.3.10 https://github.com/sewenew/redis-plus-plus.git \
     && cd redis-plus-plus \
     && mkdir build \
     && cd build \
