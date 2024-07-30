@@ -125,7 +125,7 @@ RUN git clone --depth 1 --branch v1.2.4 https://github.com/jupp0r/prometheus-cpp
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
-FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-gc-triton-devel as dev
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-gc-triton-devel as devel
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -203,7 +203,7 @@ COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-push.pc /usr/local/l
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
-FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-samples as devel
+FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-samples as iot
 
 ENV DEBIAN_FRONTEND=noninteractive
 
