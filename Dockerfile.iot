@@ -7,7 +7,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     # libatlas-base-dev libatlas3-base \
-    # clang-8 \
     # libopenblas-dev \
     # libpcre2-dev \
     # flex bison \
@@ -97,6 +96,33 @@ RUN git clone -b $TRT_OSS_CHECKOUT_TAG $TENSORRT_REPO \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
 
+WORKDIR /tmp
+
+RUN git clone --depth 1 --branch v1.2.4 https://github.com/jupp0r/prometheus-cpp.git && \
+    cd prometheus-cpp && \
+    git submodule init && git submodule update && \
+    mkdir _build && cd _build && \
+    cmake .. -DBUILD_SHARED_LIBS=ON -DENABLE_PUSH=ON -DENABLE_COMPRESSION=OFF && \
+    cmake --build . --parallel 4 && \
+    cmake --install . && \
+    cd /tmp && \
+    rm -rf prometheus-cpp
+
+# /usr/local/include/prometheus
+# /usr/local/lib/libprometheus-cpp-core.so.1.2.4
+# /usr/local/lib/libprometheus-cpp-core.so.1.2
+# /usr/local/lib/libprometheus-cpp-core.so
+# /usr/local/lib/libprometheus-cpp-pull.so
+# /usr/local/lib/libprometheus-cpp-pull.so.1.2
+# /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
+# /usr/local/lib/libprometheus-cpp-push.so.1.2.4
+# /usr/local/lib/libprometheus-cpp-push.so.1.2
+# /usr/local/lib/libprometheus-cpp-push.so
+# /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
+# /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
+# /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
+# /usr/local/lib/cmake/prometheus-cpp/
+
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
 FROM nvcr.io/nvidia/deepstream:${DS_VERSION}-samples as runtime
@@ -106,7 +132,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     libatlas-base-dev libatlas3-base \
-    clang-8 \
     libopenblas-dev \
     libpcre2-dev \
     flex bison \
@@ -158,5 +183,20 @@ RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
     && ldconfig \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
+
+COPY --from=builder /usr/local/include/prometheus /usr/local/include/prometheus
+COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2.4 /usr/local/lib/libprometheus-cpp-core.so.1.2.4
+COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2 /usr/local/lib/libprometheus-cpp-core.so.1.2
+COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so /usr/local/lib/libprometheus-cpp-core.so
+COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so /usr/local/lib/libprometheus-cpp-pull.so
+COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2 /usr/local/lib/libprometheus-cpp-pull.so.1.2
+COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2.4 /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
+COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-core.pc /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
+COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
+COPY --from=builder /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
+COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2.4 /usr/local/lib/libprometheus-cpp-push.so.1.2.4
+COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2 /usr/local/lib/libprometheus-cpp-push.so.1.2
+COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so /usr/local/lib/libprometheus-cpp-push.so
+COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-push.pc /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
