@@ -16,46 +16,10 @@ RUN apt-get update -y && \
     # libjsoncpp-dev \
     # libopencv-dev \
     libhiredis-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove \
-    && apt-get clean
-
-RUN wget https://github.com/civetweb/civetweb/archive/refs/tags/v1.16.tar.gz \
-    && tar -xvf v1.16.tar.gz \
-    && rm v1.16.tar.gz \
-    && cd civetweb-1.16 \
-    && WITH_CPP=1 TARGET_OS=LINUX make \
-    && WITH_CPP=1 TARGET_OS=LINUX make install \
-    && WITH_CPP=1 TARGET_OS=LINUX make install-headers \
-    && WITH_CPP=1 TARGET_OS=LINUX make install-slib \
-    && WITH_CPP=1 TARGET_OS=LINUX make install-lib \
-    && cd /tmp \
-    && rm -rf /tmp/civetweb-1.16/
-# /usr/local/etc/civetweb.conf
-# /usr/local/share/doc/civetweb
-# /usr/local/lib/libcivetweb.a
-# /usr/local/lib/libcivetweb.so.1
-# /usr/local/lib/libcivetweb.so.1.16.0
-# /usr/local/lib/libcivetweb.so
-# /usr/local/include/civetweb.h
-# /usr/local/include/CivetServer.h
-
-RUN git clone -b 1.3.10 https://github.com/sewenew/redis-plus-plus.git \
-    && cd redis-plus-plus \
-    && mkdir build \
-    && cd build \
-    && cmake .. \
-    && make \
-    && make install \
-    && cd /tmp \
-    && rm -rf redis-plus-plus
-# /usr/local/share/cmake/redis++
-# /usr/local/lib/libredis++.so.1.3.10
-# /usr/local/lib/libredis++.a
-# /usr/local/lib/libredis++.so.1
-# /usr/local/lib/libredis++.so
-# /usr/local/lib/pkgconfig/redis++.pc
-# /usr/local/include/sw/redis++
+    libboost-system-dev libboost-filesystem-dev libboost-program-options-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt autoremove && \
+    apt-get clean
 
 # Cmake
 WORKDIR /tmp
@@ -69,6 +33,83 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.5/cmake-3.19.5
     && cmake --version \
     && cd /tmp \
     && rm -rf /tmp/cmake-3.19.5-Linux-x86_64/
+
+FROM builder as protobuf
+
+WORKDIR /tmp
+RUN cd /tmp && git clone https://github.com/protocolbuffers/protobuf.git \
+    && cd protobuf && git checkout v29.3 \
+    && git submodule update --init --recursive \
+    && cmake -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_SHARED_LIBS=ON -Dprotobuf_BUILD_TESTS=OFF . && cmake --build . --parallel $(nproc) \
+    && make install -j$(nproc) \
+    && ldconfig \
+    && cd /tmp \
+    && mkdir /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/pkgconfig /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/cmake/absl /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/cmake/protobuf /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/cmake/utf8_range /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/libabsl* /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/libutf8* /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/libprotobuf* /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/libprotoc* /tmp/lib-protobuf \
+    && cp -rf /usr/local/lib/libupb.a /tmp/lib-protobuf \
+    && mkdir /tmp/include-protobuf \
+    && cp -rf /usr/local/include/google /tmp/include-protobuf \
+    && cp -rf /usr/local/include/absl /tmp/include-protobuf \
+    && cp -rf /usr/local/include/upb /tmp/include-protobuf \
+    && cp -rf /usr/local/include/utf8_range.h /tmp/include-protobuf \
+    && cp -rf /usr/local/include/utf8_validity.h /tmp/include-protobuf \
+    && rm -rf protobuf
+# /tmp/include-protobuf -> /usr/local/include
+# /tmp/lib-protobuf -> /usr/local/lib
+# /usr/local/bin/protoc
+
+FROM builder as civetweb
+
+RUN wget https://github.com/civetweb/civetweb/archive/refs/tags/v1.16.tar.gz \
+    && tar -xvf v1.16.tar.gz \
+    && rm v1.16.tar.gz \
+    && cd civetweb-1.16 \
+    && WITH_CPP=1 TARGET_OS=LINUX make -j$(nproc) \
+    && WITH_CPP=1 TARGET_OS=LINUX make install \
+    && WITH_CPP=1 TARGET_OS=LINUX make install-headers \
+    && WITH_CPP=1 TARGET_OS=LINUX make install-slib \
+    && WITH_CPP=1 TARGET_OS=LINUX make install-lib \
+    && cd /tmp \
+    && mkdir /tmp/lib-civetweb \
+    && cp -rf /usr/local/lib/libcivetweb* /tmp/lib-civetweb \
+    && mkdir /tmp/include-civetweb \
+    && cp -rf /usr/local/include/civetweb.h /tmp/include-civetweb \
+    && cp -rf /usr/local/include/CivetServer.h /tmp/include-civetweb \
+    && rm -rf /tmp/civetweb-1.16/
+# /usr/local/etc/civetweb.conf
+# /usr/local/share/doc/civetweb
+# /tmp/include-civetweb -> /usr/local/include
+# /tmp/lib-civetweb -> /usr/local/lib
+
+FROM builder as redis
+
+RUN git clone -b 1.3.10 https://github.com/sewenew/redis-plus-plus.git \
+    && cd redis-plus-plus \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && make install \
+    && cd /tmp \
+    && mkdir /tmp/lib-redis \
+    && cp -rf /usr/local/lib/libredis++.so.1.3.10 /tmp/lib-redis \
+    && cp -rf /usr/local/lib/libredis++.a /tmp/lib-redis \
+    && cp -rf /usr/local/lib/libredis++.so.1 /tmp/lib-redis \
+    && cp -rf /usr/local/lib/libredis++.so /tmp/lib-redis \
+    && cp -rf /usr/local/lib/pkgconfig/redis++.pc /tmp/lib-redis \
+    && rm -rf redis-plus-plus
+# /usr/local/share/cmake/redis++
+# /usr/local/include/sw/redis++
+# /tmp/lib-redis -> /usr/local/lib
+
+FROM builder as tensorRT
 
 # Build TensorRT
 ARG TRT_OSS_CHECKOUT_TAG=release/8.2
@@ -93,9 +134,11 @@ RUN git clone -b $TRT_OSS_CHECKOUT_TAG $TENSORRT_REPO \
     && ldconfig \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
+# /TensorRT/libnvinfer_plugin.so.8.*
+
+FROM builder as prometheus
 
 WORKDIR /tmp
-
 RUN git clone --depth 1 --branch v1.2.4 https://github.com/jupp0r/prometheus-cpp.git && \
     cd prometheus-cpp && \
     git submodule init && git submodule update && \
@@ -104,24 +147,39 @@ RUN git clone --depth 1 --branch v1.2.4 https://github.com/jupp0r/prometheus-cpp
     cmake --build . --parallel 4 && \
     cmake --install . && \
     cd /tmp && \
+    mkdir /tmp/lib-prometheus && \
+    cp -rf /usr/local/lib/libprometheus* /tmp/lib-prometheus && \
+    mkdir /tmp/pkgconfig-prometheus && \
+    cp -rf /usr/local/lib/pkgconfig/prometheus-cpp* /tmp/pkgconfig-prometheus && \
     rm -rf prometheus-cpp
-
 # /usr/local/include/prometheus
-# /usr/local/lib/libprometheus-cpp-core.so.1.2.4
-# /usr/local/lib/libprometheus-cpp-core.so.1.2
-# /usr/local/lib/libprometheus-cpp-core.so
-# /usr/local/lib/libprometheus-cpp-pull.so
-# /usr/local/lib/libprometheus-cpp-pull.so.1.2
-# /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
-# /usr/local/lib/libprometheus-cpp-push.so.1.2.4
-# /usr/local/lib/libprometheus-cpp-push.so.1.2
-# /usr/local/lib/libprometheus-cpp-push.so
-# /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
-# /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
-# /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
+# /tmp/lib-prometheus -> /usr/local/lib
+# /tmp/pkgconfig-prometheus -> /usr/local/lib/pkgconfig
 # /usr/local/lib/cmake/prometheus-cpp/
 
-WORKDIR /opt/nvidia/deepstream/deepstream-6.3
+FROM builder as avro
+
+RUN git clone https://github.com/apache/avro.git && \
+    cd avro/lang/c++ && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && \
+    mkdir /tmp/lib-avro && \
+    cp -rf /usr/local/lib/libavrocpp.so.1.13.0-SNAPSHOT /tmp/lib-avro && \
+    cp -rf /usr/local/lib/libavrocpp.so /tmp/lib-avro && \
+    cp -rf /usr/local/lib/libavrocpp_s.a /tmp/lib-avro && \
+    cp -rf /usr/local/lib/cmake/Avro /tmp/lib-avro && \
+    cp -rf /usr/local/lib/libfmt.a /tmp/lib-avro && \
+    cp -rf /usr/local/lib/cmake/fmt /tmp/lib-avro && \
+    cp -rf /usr/local/lib/pkgconfig/fmt.pc /tmp/lib-avro && \
+    rm -rf avro
+# /usr/local/bin/avrogencpp
+# /usr/local/include/avro
+# /usr/local/include/fmt
+# /tmp/lib-avro -> /usr/local/lib
 
 FROM hiennguyen9874/deepstream:6.3.0-devel as devel
 
@@ -150,56 +208,54 @@ RUN apt-get update -y && \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgstrtspserver-1.0-dev \
     libx11-dev \
     libyaml-cpp-dev \
-    protobuf-compiler \
     libjansson4  libjansson-dev \
-    libprotobuf-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove \
-    && apt-get clean
+    nlohmann-json3-dev iputils-ping netcat-traditional \
+    libboost-system-dev libboost-filesystem-dev libboost-program-options-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt autoremove && \
+    apt-get clean
+
+# protobuf
+COPY --from=protobuf /tmp/include-protobuf /usr/local/include
+COPY --from=protobuf /tmp/lib-protobuf /usr/local/lib
+COPY --from=protobuf /usr/local/bin/protoc /usr/local/bin/protoc
 
 # civetweb
-COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
-COPY --from=builder /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
-COPY --from=builder /usr/local/lib/libcivetweb.a /usr/local/lib/libcivetweb.a
-COPY --from=builder /usr/local/lib/libcivetweb.so.1 /usr/local/lib/libcivetweb.so.1
-COPY --from=builder /usr/local/lib/libcivetweb.so.1.16.0 /usr/local/lib/libcivetweb.so.1.16.0
-COPY --from=builder /usr/local/lib/libcivetweb.so /usr/local/lib/libcivetweb.so
-COPY --from=builder /usr/local/include/civetweb.h /usr/local/include/civetweb.h
-COPY --from=builder /usr/local/include/CivetServer.h /usr/local/include/CivetServer.h
+COPY --from=civetweb /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
+COPY --from=civetweb /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
+COPY --from=civetweb /tmp/include-civetweb /usr/local/include
+COPY --from=civetweb /tmp/lib-civetweb /usr/local/lib
 
 # redis plus plus
-COPY --from=builder /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
-COPY --from=builder /usr/local/lib/libredis++.so.1.3.10 /usr/local/lib/libredis++.so.1.3.10
-COPY --from=builder /usr/local/lib/libredis++.a /usr/local/lib/libredis++.a
-COPY --from=builder /usr/local/lib/libredis++.so.1 /usr/local/lib/libredis++.so.1
-COPY --from=builder /usr/local/lib/libredis++.so /usr/local/lib/libredis++.so
-COPY --from=builder /usr/local/lib/pkgconfig/redis++.pc /usr/local/lib/pkgconfig/redis++.pc
-COPY --from=builder /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+COPY --from=redis /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
+COPY --from=redis /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+COPY --from=redis /tmp/lib-redis /usr/local/lib
 
 # tensorRT
-COPY --from=builder /TensorRT /tmp/TensorRT
+COPY --from=tensorRT /TensorRT /tmp/TensorRT
 RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
     $(find /usr/lib/x86_64-linux-gnu/ -name "libnvinfer_plugin.so.8.*" -print -quit) \
     && ldconfig \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
 
-COPY --from=builder /usr/local/include/prometheus /usr/local/include/prometheus
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2.4 /usr/local/lib/libprometheus-cpp-core.so.1.2.4
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2 /usr/local/lib/libprometheus-cpp-core.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so /usr/local/lib/libprometheus-cpp-core.so
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so /usr/local/lib/libprometheus-cpp-pull.so
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2 /usr/local/lib/libprometheus-cpp-pull.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2.4 /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-core.pc /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
-COPY --from=builder /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2.4 /usr/local/lib/libprometheus-cpp-push.so.1.2.4
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2 /usr/local/lib/libprometheus-cpp-push.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so /usr/local/lib/libprometheus-cpp-push.so
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-push.pc /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
+# prometheus
+COPY --from=prometheus /usr/local/include/prometheus /usr/local/include/prometheus
+COPY --from=prometheus /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
+COPY --from=prometheus /tmp/lib-prometheus /usr/local/lib
+COPY --from=prometheus /tmp/pkgconfig-prometheus /usr/local/lib/pkgconfig
+
+# avro
+COPY --from=avro /usr/local/bin/avrogencpp /usr/local/bin/avrogencpp
+COPY --from=avro /usr/local/include/avro /usr/local/include/avro
+COPY --from=avro /usr/local/include/fmt /usr/local/include/fmt
+COPY --from=avro /tmp/lib-avro /usr/local/lib
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
+
+RUN bash /opt/nvidia/deepstream/deepstream/user_additional_install.sh
+
+RUN ldconfig
 
 FROM hiennguyen9874/deepstream:6.3.0-samples as samples
 
@@ -225,57 +281,57 @@ RUN apt-get update -y && \
     libavcodec58 libavformat-dev libavformat58 libavfilter7 libde265-dev \
     libde265-0 libx264-155 libx265-179 libvpx6 \
     libmpeg2encpp-2.1-0 libmpeg2-4 libmpg123-0 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove \
-    && apt-get clean
+    nlohmann-json3-dev iputils-ping netcat-traditional \
+    libboost-system-dev libboost-filesystem-dev libboost-program-options-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt autoremove && \
+    apt-get clean
 
 RUN ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so && \
     ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so && \
     ldconfig
 
+# protobuf
+COPY --from=protobuf /tmp/include-protobuf /usr/local/include
+COPY --from=protobuf /tmp/lib-protobuf /usr/local/lib
+COPY --from=protobuf /usr/local/bin/protoc /usr/local/bin/protoc
+
 # civetweb
-COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
-COPY --from=builder /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
-COPY --from=builder /usr/local/lib/libcivetweb.a /usr/local/lib/libcivetweb.a
-COPY --from=builder /usr/local/lib/libcivetweb.so.1 /usr/local/lib/libcivetweb.so.1
-COPY --from=builder /usr/local/lib/libcivetweb.so.1.16.0 /usr/local/lib/libcivetweb.so.1.16.0
-COPY --from=builder /usr/local/lib/libcivetweb.so /usr/local/lib/libcivetweb.so
-COPY --from=builder /usr/local/include/civetweb.h /usr/local/include/civetweb.h
-COPY --from=builder /usr/local/include/CivetServer.h /usr/local/include/CivetServer.h
+COPY --from=civetweb /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
+COPY --from=civetweb /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
+COPY --from=civetweb /tmp/include-civetweb /usr/local/include
+COPY --from=civetweb /tmp/lib-civetweb /usr/local/lib
 
 # redis plus plus
-COPY --from=builder /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
-COPY --from=builder /usr/local/lib/libredis++.so.1.3.10 /usr/local/lib/libredis++.so.1.3.10
-COPY --from=builder /usr/local/lib/libredis++.a /usr/local/lib/libredis++.a
-COPY --from=builder /usr/local/lib/libredis++.so.1 /usr/local/lib/libredis++.so.1
-COPY --from=builder /usr/local/lib/libredis++.so /usr/local/lib/libredis++.so
-COPY --from=builder /usr/local/lib/pkgconfig/redis++.pc /usr/local/lib/pkgconfig/redis++.pc
-COPY --from=builder /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+COPY --from=redis /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
+COPY --from=redis /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+COPY --from=redis /tmp/lib-redis /usr/local/lib
 
 # tensorRT
-COPY --from=builder /TensorRT /tmp/TensorRT
+COPY --from=tensorRT /TensorRT /tmp/TensorRT
 RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
     $(find /usr/lib/x86_64-linux-gnu/ -name "libnvinfer_plugin.so.8.*" -print -quit) \
     && ldconfig \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
 
-COPY --from=builder /usr/local/include/prometheus /usr/local/include/prometheus
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2.4 /usr/local/lib/libprometheus-cpp-core.so.1.2.4
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2 /usr/local/lib/libprometheus-cpp-core.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so /usr/local/lib/libprometheus-cpp-core.so
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so /usr/local/lib/libprometheus-cpp-pull.so
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2 /usr/local/lib/libprometheus-cpp-pull.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2.4 /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-core.pc /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
-COPY --from=builder /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2.4 /usr/local/lib/libprometheus-cpp-push.so.1.2.4
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2 /usr/local/lib/libprometheus-cpp-push.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so /usr/local/lib/libprometheus-cpp-push.so
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-push.pc /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
+# prometheus
+COPY --from=prometheus /usr/local/include/prometheus /usr/local/include/prometheus
+COPY --from=prometheus /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
+COPY --from=prometheus /tmp/lib-prometheus /usr/local/lib
+COPY --from=prometheus /tmp/pkgconfig-prometheus /usr/local/lib/pkgconfig
+
+# avro
+COPY --from=avro /usr/local/bin/avrogencpp /usr/local/bin/avrogencpp
+COPY --from=avro /usr/local/include/avro /usr/local/include/avro
+COPY --from=avro /usr/local/include/fmt /usr/local/include/fmt
+COPY --from=avro /tmp/lib-avro /usr/local/lib
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
+
+RUN bash /opt/nvidia/deepstream/deepstream/user_additional_install.sh
+
+RUN ldconfig
 
 FROM hiennguyen9874/deepstream:6.3.0-base as base
 
@@ -283,6 +339,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
+    zip \
     libatlas-base-dev libatlas3-base \
     libopenblas-dev \
     libpcre2-dev \
@@ -301,54 +358,54 @@ RUN apt-get update -y && \
     libavcodec58 libavformat-dev libavformat58 libavfilter7 libde265-dev \
     libde265-0 libx264-155 libx265-179 libvpx6 \
     libmpeg2encpp-2.1-0 libmpeg2-4 libmpg123-0 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt autoremove \
-    && apt-get clean
+    nlohmann-json3-dev iputils-ping netcat-traditional \
+    libboost-system-dev libboost-filesystem-dev libboost-program-options-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt autoremove && \
+    apt-get clean
 
 RUN ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublasLt.so && \
     ln -s /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so.11 /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so && \
     ldconfig
 
+# protobuf
+COPY --from=protobuf /tmp/include-protobuf /usr/local/include
+COPY --from=protobuf /tmp/lib-protobuf /usr/local/lib
+COPY --from=protobuf /usr/local/bin/protoc /usr/local/bin/protoc
+
 # civetweb
-COPY --from=builder /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
-COPY --from=builder /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
-COPY --from=builder /usr/local/lib/libcivetweb.a /usr/local/lib/libcivetweb.a
-COPY --from=builder /usr/local/lib/libcivetweb.so.1 /usr/local/lib/libcivetweb.so.1
-COPY --from=builder /usr/local/lib/libcivetweb.so.1.16.0 /usr/local/lib/libcivetweb.so.1.16.0
-COPY --from=builder /usr/local/lib/libcivetweb.so /usr/local/lib/libcivetweb.so
-COPY --from=builder /usr/local/include/civetweb.h /usr/local/include/civetweb.h
-COPY --from=builder /usr/local/include/CivetServer.h /usr/local/include/CivetServer.h
+COPY --from=civetweb /usr/local/etc/civetweb.conf /usr/local/etc/civetweb.conf
+COPY --from=civetweb /usr/local/share/doc/civetweb /usr/local/share/doc/civetweb
+COPY --from=civetweb /tmp/include-civetweb /usr/local/include
+COPY --from=civetweb /tmp/lib-civetweb /usr/local/lib
 
 # redis plus plus
-COPY --from=builder /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
-COPY --from=builder /usr/local/lib/libredis++.so.1.3.10 /usr/local/lib/libredis++.so.1.3.10
-COPY --from=builder /usr/local/lib/libredis++.a /usr/local/lib/libredis++.a
-COPY --from=builder /usr/local/lib/libredis++.so.1 /usr/local/lib/libredis++.so.1
-COPY --from=builder /usr/local/lib/libredis++.so /usr/local/lib/libredis++.so
-COPY --from=builder /usr/local/lib/pkgconfig/redis++.pc /usr/local/lib/pkgconfig/redis++.pc
-COPY --from=builder /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+COPY --from=redis /usr/local/share/cmake/redis++ /usr/local/share/cmake/redis++
+COPY --from=redis /usr/local/include/sw/redis++ /usr/local/include/sw/redis++
+COPY --from=redis /tmp/lib-redis /usr/local/lib
 
 # tensorRT
-COPY --from=builder /TensorRT /tmp/TensorRT
+COPY --from=tensorRT /TensorRT /tmp/TensorRT
 RUN cp $(find /tmp/TensorRT -name "libnvinfer_plugin.so.8.*" -print -quit) \
     $(find /usr/lib/x86_64-linux-gnu/ -name "libnvinfer_plugin.so.8.*" -print -quit) \
     && ldconfig \
     && cd /tmp \
     && rm -rf /tmp/TensorRT
 
-COPY --from=builder /usr/local/include/prometheus /usr/local/include/prometheus
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2.4 /usr/local/lib/libprometheus-cpp-core.so.1.2.4
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so.1.2 /usr/local/lib/libprometheus-cpp-core.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-core.so /usr/local/lib/libprometheus-cpp-core.so
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so /usr/local/lib/libprometheus-cpp-pull.so
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2 /usr/local/lib/libprometheus-cpp-pull.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-pull.so.1.2.4 /usr/local/lib/libprometheus-cpp-pull.so.1.2.4
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-core.pc /usr/local/lib/pkgconfig/prometheus-cpp-core.pc
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc /usr/local/lib/pkgconfig/prometheus-cpp-pull.pc
-COPY --from=builder /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2.4 /usr/local/lib/libprometheus-cpp-push.so.1.2.4
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so.1.2 /usr/local/lib/libprometheus-cpp-push.so.1.2
-COPY --from=builder /usr/local/lib/libprometheus-cpp-push.so /usr/local/lib/libprometheus-cpp-push.so
-COPY --from=builder /usr/local/lib/pkgconfig/prometheus-cpp-push.pc /usr/local/lib/pkgconfig/prometheus-cpp-push.pc
+# prometheus
+COPY --from=prometheus /usr/local/include/prometheus /usr/local/include/prometheus
+COPY --from=prometheus /usr/local/lib/cmake/prometheus-cpp/ /usr/local/lib/cmake/prometheus-cpp/
+COPY --from=prometheus /tmp/lib-prometheus /usr/local/lib
+COPY --from=prometheus /tmp/pkgconfig-prometheus /usr/local/lib/pkgconfig
+
+# avro
+COPY --from=avro /usr/local/bin/avrogencpp /usr/local/bin/avrogencpp
+COPY --from=avro /usr/local/include/avro /usr/local/include/avro
+COPY --from=avro /usr/local/include/fmt /usr/local/include/fmt
+COPY --from=avro /tmp/lib-avro /usr/local/lib
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
+
+RUN bash /opt/nvidia/deepstream/deepstream/user_additional_install.sh
+
+RUN ldconfig

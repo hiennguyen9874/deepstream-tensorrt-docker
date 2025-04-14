@@ -4,6 +4,8 @@
 
 - opencv
 - hiredis
+- Protobuf
+- Avro
 - [Civetweb](https://github.com/civetweb/civetweb)
 - [redis-plus-plus](https://github.com/sewenew/redis-plus-plus.git)
 - [CMake](https://github.com/Kitware/CMake)
