@@ -4,6 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
+    python3-pip \
     # libatlas-base-dev libatlas3-base \
     # libopenblas-dev \
     # libpcre2-dev \
@@ -23,16 +24,16 @@ RUN apt-get update -y && \
 
 # Cmake
 WORKDIR /tmp
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.19.5/cmake-3.19.5-Linux-x86_64.tar.gz \
-    && tar -zxvf cmake-3.19.5-Linux-x86_64.tar.gz \
-    && rm cmake-3.19.5-Linux-x86_64.tar.gz \
-    && cd /tmp/cmake-3.19.5-Linux-x86_64/ \
+RUN cd /tmp && wget https://github.com/Kitware/CMake/releases/download/v3.31.8/cmake-3.31.8-linux-x86_64.tar.gz \
+    && tar -zxvf cmake-3.31.8-linux-x86_64.tar.gz \
+    && rm cmake-3.31.8-linux-x86_64.tar.gz \
+    && cd /tmp/cmake-3.31.8-linux-x86_64/ \
     && cp -rf bin/ doc/ share/ /usr/local/ \
     && cp -rf man/* /usr/local/man \
     && sync \
     && cmake --version \
     && cd /tmp \
-    && rm -rf /tmp/cmake-3.19.5-Linux-x86_64/
+    && rm -rf /tmp/cmake-3.31.8-linux-x86_64/
 
 FROM builder as protobuf
 
@@ -159,7 +160,7 @@ RUN git clone --depth 1 --branch v1.2.4 https://github.com/jupp0r/prometheus-cpp
 
 FROM builder as avro
 
-RUN git clone https://github.com/apache/avro.git && \
+RUN git clone --branch release-1.12.1 https://github.com/apache/avro.git && \
     cd avro/lang/c++ && \
     mkdir build && \
     cd build && \
@@ -168,18 +169,76 @@ RUN git clone https://github.com/apache/avro.git && \
     make install && \
     cd /tmp && \
     mkdir /tmp/lib-avro && \
-    cp -rf /usr/local/lib/libavrocpp.so.1.13.0-SNAPSHOT /tmp/lib-avro && \
-    cp -rf /usr/local/lib/libavrocpp.so /tmp/lib-avro && \
-    cp -rf /usr/local/lib/libavrocpp_s.a /tmp/lib-avro && \
-    cp -rf /usr/local/lib/cmake/Avro /tmp/lib-avro && \
-    cp -rf /usr/local/lib/libfmt.a /tmp/lib-avro && \
-    cp -rf /usr/local/lib/cmake/fmt /tmp/lib-avro && \
-    cp -rf /usr/local/lib/pkgconfig/fmt.pc /tmp/lib-avro && \
+    mkdir /tmp/lib-avro/cmake && \
+    mkdir /tmp/lib-avro/pkgconfig && \
+    cp -rf /usr/local/lib/libavrocpp.so /tmp/lib-avro/ && \
+    cp -rf /usr/local/lib/libavrocpp.so.1.12.1 /tmp/lib-avro/ && \
+    cp -rf /usr/local/lib/libavrocpp_s.a /tmp/lib-avro/ && \
+    cp -rf /usr/local/lib/cmake/avro-cpp /tmp/lib-avro/cmake/avro-cpp && \
+    cp -rf /usr/local/lib/libfmt.a /tmp/lib-avro/ && \
+    cp -rf /usr/local/lib/cmake/fmt /tmp/lib-avro/cmake/fmt && \
+    cp -rf /usr/local/lib/pkgconfig/fmt.pc /tmp/lib-avro/pkgconfig/fmt.pc && \
     rm -rf avro
 # /usr/local/bin/avrogencpp
 # /usr/local/include/avro
 # /usr/local/include/fmt
 # /tmp/lib-avro -> /usr/local/lib
+
+FROM builder as cpr
+
+RUN cd /tmp && \
+    if [ -d "/tmp/cpr" ]; then rm -Rf /tmp/cpr; fi && \
+    git clone --depth 1 --branch 1.11.1 https://github.com/libcpr/cpr.git && \
+    cd cpr && \
+    mkdir _build && cd _build && \
+    cmake .. -DBUILD_SHARED_LIBS=ON -DCPR_USE_SYSTEM_CURL=ON -DCPR_BUILD_TESTS=OFF -DCPR_ENABLE_SSL=ON && \
+    cmake --build . --parallel 4 && \
+    cmake --install . && \
+    ldconfig && \
+    cd /tmp && \
+    rm -rf cpr
+# /usr/local/lib/libcpr.so.1.11.1
+# /usr/local/lib/libcpr.so.1
+# /usr/local/lib/libcpr.so
+# /usr/local/lib/cmake/cpr
+# /usr/local/include/cpr
+
+FROM builder as spdlog
+
+RUN cd /tmp && \
+    if [ -d "/tmp/spdlog" ]; then rm -Rf /tmp/spdlog; fi && \
+    git clone --depth 1 --branch v1.15.0 https://github.com/gabime/spdlog && \
+    cd spdlog && \
+    mkdir _build && cd _build && \
+    cmake .. -DBUILD_SHARED_LIBS=ON && \
+    cmake --build . --parallel 4 && \
+    cmake --install . && \
+    ldconfig && \
+    cd /tmp && \
+    rm -rf spdlog
+# /usr/local/include/spdlog
+# /usr/local/lib/libspdlog.so.1.15.0
+# /usr/local/lib/libspdlog.so.1.15
+# /usr/local/lib/libspdlog.so
+# /usr/local/lib/cmake/spdlog
+# /usr/local/lib/pkgconfig/spdlog.pc
+
+FROM builder as onnxruntime
+
+# Install ONNX Runtime
+ARG ORT_VERSION=1.22.0
+RUN mkdir -p /tmp/onnxruntime && \
+    cd /tmp/onnxruntime && \
+    curl -L -o onnxruntime-linux-x64-${ORT_VERSION}.tgz \
+    "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz" && \
+    mkdir -p /opt/onnxruntime && \
+    tar -xvzf onnxruntime-linux-x64-${ORT_VERSION}.tgz -C /opt/onnxruntime --strip-components=1 && \
+    rm -rf /tmp/onnxruntime
+
+ENV ONNXRUNTIME_DIR=/opt/onnxruntime
+ENV CPLUS_INCLUDE_PATH=$ONNXRUNTIME_DIR/include:$CPLUS_INCLUDE_PATH
+ENV LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LIBRARY_PATH
+ENV LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH
 
 FROM hiennguyen9874/deepstream:6.3.0-devel as devel
 
@@ -187,6 +246,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
+    python3-pip \
     libatlas-base-dev libatlas3-base \
     libopenblas-dev \
     libpcre2-dev \
@@ -251,6 +311,21 @@ COPY --from=avro /usr/local/include/avro /usr/local/include/avro
 COPY --from=avro /usr/local/include/fmt /usr/local/include/fmt
 COPY --from=avro /tmp/lib-avro /usr/local/lib
 
+COPY --from=cpr /usr/local/lib/libcpr.so.1.11.1 /usr/local/lib/libcpr.so.1.11.1
+COPY --from=cpr /usr/local/lib/libcpr.so.1 /usr/local/lib/libcpr.so.1
+COPY --from=cpr /usr/local/lib/libcpr.so /usr/local/lib/libcpr.so
+COPY --from=cpr /usr/local/lib/cmake/cpr /usr/local/lib/cmake/cpr
+COPY --from=cpr /usr/local/include/cpr /usr/local/include/cpr
+
+COPY --from=spdlog /usr/local/include/spdlog /usr/local/include/spdlog
+COPY --from=spdlog /usr/local/lib/libspdlog.so.1.15.0 /usr/local/lib/libspdlog.so.1.15.0
+COPY --from=spdlog /usr/local/lib/libspdlog.so.1.15 /usr/local/lib/libspdlog.so.1.15
+COPY --from=spdlog /usr/local/lib/libspdlog.so /usr/local/lib/libspdlog.so
+COPY --from=spdlog /usr/local/lib/cmake/spdlog /usr/local/lib/cmake/spdlog
+COPY --from=spdlog /usr/local/lib/pkgconfig/spdlog.pc /usr/local/lib/pkgconfig/spdlog.pc
+
+COPY --from=onnxruntime /opt/onnxruntime /opt/onnxruntime
+
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
 RUN bash /opt/nvidia/deepstream/deepstream/user_additional_install.sh
@@ -263,6 +338,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
+    python3-pip \
     libatlas-base-dev libatlas3-base \
     libopenblas-dev \
     libpcre2-dev \
@@ -327,6 +403,21 @@ COPY --from=avro /usr/local/include/avro /usr/local/include/avro
 COPY --from=avro /usr/local/include/fmt /usr/local/include/fmt
 COPY --from=avro /tmp/lib-avro /usr/local/lib
 
+COPY --from=cpr /usr/local/lib/libcpr.so.1.11.1 /usr/local/lib/libcpr.so.1.11.1
+COPY --from=cpr /usr/local/lib/libcpr.so.1 /usr/local/lib/libcpr.so.1
+COPY --from=cpr /usr/local/lib/libcpr.so /usr/local/lib/libcpr.so
+COPY --from=cpr /usr/local/lib/cmake/cpr /usr/local/lib/cmake/cpr
+COPY --from=cpr /usr/local/include/cpr /usr/local/include/cpr
+
+COPY --from=spdlog /usr/local/include/spdlog /usr/local/include/spdlog
+COPY --from=spdlog /usr/local/lib/libspdlog.so.1.15.0 /usr/local/lib/libspdlog.so.1.15.0
+COPY --from=spdlog /usr/local/lib/libspdlog.so.1.15 /usr/local/lib/libspdlog.so.1.15
+COPY --from=spdlog /usr/local/lib/libspdlog.so /usr/local/lib/libspdlog.so
+COPY --from=spdlog /usr/local/lib/cmake/spdlog /usr/local/lib/cmake/spdlog
+COPY --from=spdlog /usr/local/lib/pkgconfig/spdlog.pc /usr/local/lib/pkgconfig/spdlog.pc
+
+COPY --from=onnxruntime /opt/onnxruntime /opt/onnxruntime
+
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
 RUN bash /opt/nvidia/deepstream/deepstream/user_additional_install.sh
@@ -339,6 +430,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
+    python3-pip \
     zip \
     libatlas-base-dev libatlas3-base \
     libopenblas-dev \
@@ -403,6 +495,21 @@ COPY --from=avro /usr/local/bin/avrogencpp /usr/local/bin/avrogencpp
 COPY --from=avro /usr/local/include/avro /usr/local/include/avro
 COPY --from=avro /usr/local/include/fmt /usr/local/include/fmt
 COPY --from=avro /tmp/lib-avro /usr/local/lib
+
+COPY --from=cpr /usr/local/lib/libcpr.so.1.11.1 /usr/local/lib/libcpr.so.1.11.1
+COPY --from=cpr /usr/local/lib/libcpr.so.1 /usr/local/lib/libcpr.so.1
+COPY --from=cpr /usr/local/lib/libcpr.so /usr/local/lib/libcpr.so
+COPY --from=cpr /usr/local/lib/cmake/cpr /usr/local/lib/cmake/cpr
+COPY --from=cpr /usr/local/include/cpr /usr/local/include/cpr
+
+COPY --from=spdlog /usr/local/include/spdlog /usr/local/include/spdlog
+COPY --from=spdlog /usr/local/lib/libspdlog.so.1.15.0 /usr/local/lib/libspdlog.so.1.15.0
+COPY --from=spdlog /usr/local/lib/libspdlog.so.1.15 /usr/local/lib/libspdlog.so.1.15
+COPY --from=spdlog /usr/local/lib/libspdlog.so /usr/local/lib/libspdlog.so
+COPY --from=spdlog /usr/local/lib/cmake/spdlog /usr/local/lib/cmake/spdlog
+COPY --from=spdlog /usr/local/lib/pkgconfig/spdlog.pc /usr/local/lib/pkgconfig/spdlog.pc
+
+COPY --from=onnxruntime /opt/onnxruntime /opt/onnxruntime
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
