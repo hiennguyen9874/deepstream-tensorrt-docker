@@ -326,6 +326,11 @@ COPY --from=spdlog /usr/local/lib/pkgconfig/spdlog.pc /usr/local/lib/pkgconfig/s
 
 COPY --from=onnxruntime /opt/onnxruntime /opt/onnxruntime
 
+ENV ONNXRUNTIME_DIR=/opt/onnxruntime
+ENV CPLUS_INCLUDE_PATH=$ONNXRUNTIME_DIR/include:$CPLUS_INCLUDE_PATH
+ENV LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LIBRARY_PATH
+ENV LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH
+
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
 RUN bash /opt/nvidia/deepstream/deepstream/user_additional_install.sh
@@ -417,6 +422,11 @@ COPY --from=spdlog /usr/local/lib/cmake/spdlog /usr/local/lib/cmake/spdlog
 COPY --from=spdlog /usr/local/lib/pkgconfig/spdlog.pc /usr/local/lib/pkgconfig/spdlog.pc
 
 COPY --from=onnxruntime /opt/onnxruntime /opt/onnxruntime
+
+ENV ONNXRUNTIME_DIR=/opt/onnxruntime
+ENV CPLUS_INCLUDE_PATH=$ONNXRUNTIME_DIR/include:$CPLUS_INCLUDE_PATH
+ENV LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LIBRARY_PATH
+ENV LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
@@ -510,6 +520,11 @@ COPY --from=spdlog /usr/local/lib/cmake/spdlog /usr/local/lib/cmake/spdlog
 COPY --from=spdlog /usr/local/lib/pkgconfig/spdlog.pc /usr/local/lib/pkgconfig/spdlog.pc
 
 COPY --from=onnxruntime /opt/onnxruntime /opt/onnxruntime
+
+ENV ONNXRUNTIME_DIR=/opt/onnxruntime
+ENV CPLUS_INCLUDE_PATH=$ONNXRUNTIME_DIR/include:$CPLUS_INCLUDE_PATH
+ENV LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LIBRARY_PATH
+ENV LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH
 
 WORKDIR /opt/nvidia/deepstream/deepstream-6.3
 
